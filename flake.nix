@@ -12,6 +12,7 @@
     devShells.${system}.default = pkgs.mkShell {
       buildInputs = [
         pkgs.nasm
+        pkgs.gdb
       ];
 
       shellHook = ''
