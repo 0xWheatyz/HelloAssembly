@@ -11,8 +11,8 @@ section .data
   buf_size    equ 1
   buffer      db 0
   question    db 0
-  player_x    db 0
-  player_y    db 0
+  player_x    db 3
+  player_y    db 2
 
 section .bss
   termios_old resb 60
@@ -83,54 +83,66 @@ print_player:
   call print_question
   ret
 
+print_map:
+  mov rbx, 0                ; rbx = current row (Y)
+
+  .row_loop:
+    cmp rbx, 10
+    jge .done                 ; if row >= 10, exit
+
+    mov rcx, 0                ; rcx = current column (X)
+
+    .column_loop:
+      cmp rcx, 40
+      jge .end_row              ; if col >= 10, go to newline
+      
+      push rcx
+
+        ; Load player_x and compare to current column (rcx)
+      mov al, [player_x]
+      cmp cl, al
+      jne .not_player
+
+      ; Compare row (rbx) to player_y
+      mov al, [player_y]
+      mov dl, bl
+      cmp dl, al
+      jne .not_player
+
+      ; Both match — draw player
+      call print_player
+      pop rcx
+      jmp .next_column
+
+  .not_player:
+    call print_dot
+    pop rcx
+    jmp .next_column
+
+  .next_column:
+    inc rcx
+    jmp .column_loop
+
+  .end_row:
+    call print_newline
+    inc rbx
+    jmp .row_loop
+
+  .done:
+    ret
+
+
 _start: 
   ; Get current terminal settings
   mov rdi, fd_stdin
   mov rsi, termios_old
   call tcgetattr
 
+  ; Remove the need for enter and the echoing of keys
   call change_terminal_settings
 
-  ; Build the map
-  mov rbx, 0
-  .row_loop:
-    ; If rbx is 10, jump to done
-    cmp rbx, 10
-    jge .done
-    
-    ; Define inner loop
-    mov rcx, 0
-    
-  .column_loop:
-    ; if rcx is 10 write a newline as the row as finished printing
-    cmp rcx, 10
-    jge .newline
-    
-    ; Save rcx from function calls
-    push rcx
-
-    ; If currently attempting to print dot not occupied by player, print
-    mov al, [player_x]
-    cmp cl, al
-    jne .print_dot
-    
-    mov al, [player_y]
-    mov dl, bl
-    jne .print_dot
-
-    ; X and Y matched, printing player
-    call print_player
-
-    pop rcx
-    jmp .next
-
-  push rbx
-  call print_newline
-  pop rbx
-  dec rbx
-  jnz .row_loop
-
-  .done:
+  ; Build the first map
+  call print_map
 
   ; Restore terminal settings
   mov rdi, fd_stdin
