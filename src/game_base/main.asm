@@ -5,16 +5,19 @@ extern write
 extern exit
 
 section .data
-  map_size    equ 10
+  map_size    equ 40
   fd_stdin    equ 0
   TCSANOW     equ 0
-  question_len db 1
   buf_size    equ 1
+  buf_len     db 1
   buffer      db 0
-  question    db 0
+  buf         db 0
+  line_buf    db 0
+  message     db 0
+  message_len db 0
   player_x    db 0
   player_y    db 0
-  clear_seq db 0x1B, '[', '2', 'J', 0x1B, '[', 'H'
+  clear_seq   db 0x1B, '[', '2', 'J', 0x1B, '[', 'H'
   clear_seq_len equ $ - clear_seq
 
 section .bss
@@ -49,11 +52,11 @@ change_terminal_settings:
   pop rcx
   ret
 
-print_question:
+print_buf:
   mov rax, 1
   mov rdi, 1
-  mov rsi, question
-  movzx rdx, byte [question_len]
+  mov rsi, buf
+  movzx rdx, byte [buf_len]
   syscall
 
   ret
@@ -75,29 +78,47 @@ clear_screen:
   syscall
   ret
 
+
 ; Build map functions
 print_dot: 
-  mov byte [question], "*"
-  mov byte [question_len], 1
-  call print_question
+  mov byte [buf], "."
+  mov byte [buf_len], 1
+  call print_buf
   ret
 
 print_newline:
-  mov byte [question], 0x0A
-  mov byte [question_len], 1
-  call print_question
+  mov byte [buf], 0x0A
+  mov byte [buf_len], 1
+  call print_buf
   ret
 
-print_edge:
-  mov byte [question], "|"
-  mov byte [question_len], 1
-  call print_question
-  ret
+
+fill_line:
+  mov rax, map_size
+  dec rax
+  dec rax
+
+  mov rcx, rax
+  .loop:
+    push rcx
+
+    mov rax, 1
+    mov rdi, 1 
+    mov rsi, line_buf
+    mov rdx, 1
+    syscall
+    
+    pop rcx
+    dec rcx
+    jnz .loop
+  
+  .done:
+    ret
 
 print_player:
-  mov byte [question], "@"
-  mov byte [question_len], 1
-  call print_question
+  mov byte [buf], "@"
+  mov byte [buf_len], 1
+  call print_buf
   ret
 
 print_map:
@@ -146,6 +167,10 @@ print_map:
     jmp .row_loop
 
   .done:
+
+    mov byte [message_len], 76 
+    mov byte [message], "[Alex]: 'This is where it happened. My life's work... gone in a flash drive.'"
+    call message_box
     ret
 
 ; Update the player_x and player_y variables based on the read_input function
@@ -204,16 +229,52 @@ movement:
     dec byte [player_y]
     jmp .done
   
-  .fail_left
+  .fail_left:
     inc byte [player_x]
     jmp .done
 
-  .fail_right
+  .fail_right:
     dec byte [player_x]
     jmp .done
 
   .done:
     ret
+
+message_box:
+  ; Print top line of the message box
+  ; print top left slash
+  mov byte [buf], "/"
+  mov byte [buf_len], 1
+  call print_buf
+  
+  ; Print the whole line of dashes
+  mov byte [line_buf], "-"
+  call fill_line
+
+  ; Print top right corner
+  mov byte [buf], "\"
+  mov byte [buf_len], 1
+  call print_buf
+
+  ; Make a new line
+  call print_newline
+
+  ; Print new vertical markers
+  mov byte [buf], "|"
+  mov byte [buf_len], 1
+  call print_buf
+ 
+  ; Print an empty line to give extra spacing 
+  ; between the text and top bar
+  mov byte [line_buf], " "
+  call fill_line
+  call print_buf
+  
+  ; Print the text
+  mov byte [buf], byte [message]
+  mov byte [buf_len], byte [message_len]
+  
+  ret
 
 _start: 
   ; Get current terminal settings
