@@ -9,17 +9,21 @@ section .data
   fd_stdin    equ 0
   TCSANOW     equ 0
   buf_size    equ 1
+  ;message     db "[Alex]: This is where it happened. My life's work... gone in a flash drive."
+  ;message_len equ $ - message
+
   buf_len     db 1
   buffer      db 0
   buf         db 0
   line_buf    db 0
-  message     db 0
-  message_len db 0
+  line_len    db 0
   player_x    db 0
   player_y    db 0
   clear_seq   db 0x1B, '[', '2', 'J', 0x1B, '[', 'H'
   clear_seq_len equ $ - clear_seq
-
+  welcome_msg db "Welcome to my game!"
+  welcome_msg_len equ $ - welcome_msg
+  
 section .bss
   termios_old resb 60
   termios_new resb 60
@@ -94,23 +98,18 @@ print_newline:
 
 
 fill_line:
-  mov rax, map_size
-  dec rax
-  dec rax
+  movzx rcx, byte [line_len]
+  sub rcx, 2
 
-  mov rcx, rax
   .loop:
     push rcx
-
     mov rax, 1
     mov rdi, 1 
     mov rsi, line_buf
     mov rdx, 1
     syscall
-    
-    pop rcx
-    dec rcx
-    jnz .loop
+    pop rcx 
+    loop .loop
   
   .done:
     ret
@@ -168,8 +167,8 @@ print_map:
 
   .done:
 
-    mov byte [message_len], 76 
-    mov byte [message], "[Alex]: 'This is where it happened. My life's work... gone in a flash drive.'"
+;    mov byte [message_len], 76 
+;    mov byte [message], "[Alex]: This is where it happened. My life's work... gone in a flash drive."
     call message_box
     ret
 
@@ -249,6 +248,7 @@ message_box:
   
   ; Print the whole line of dashes
   mov byte [line_buf], "-"
+  mov byte [line_len], map_size
   call fill_line
 
   ; Print top right corner
@@ -259,7 +259,7 @@ message_box:
   ; Make a new line
   call print_newline
 
-  ; Print new vertical markers
+  ; Print new left vertical marker
   mov byte [buf], "|"
   mov byte [buf_len], 1
   call print_buf
@@ -268,12 +268,42 @@ message_box:
   ; between the text and top bar
   mov byte [line_buf], " "
   call fill_line
+  
+  ; Print the right vertical marker
+  mov byte [buf], "|"
+  mov byte [buf_len], 1
   call print_buf
   
-  ; Print the text
-  mov byte [buf], byte [message]
-  mov byte [buf_len], byte [message_len]
+  ; Make new line
+  call print_newline
   
+  ; Make left marker
+  mov byte [buf], "|"
+  mov byte [buf_len], 1
+  call print_buf 
+ 
+  ; Print the text and the following whitespace to 
+  ; make sure the walls on the box line up
+  ; Print the text
+  mov rax, 1
+  mov rdi, 1
+  mov rsi, welcome_msg
+  mov rdx, welcome_msg_len
+  syscall
+  ; Calculate the length of spaces, map size - the length of the message
+  mov r9, map_size
+  sub r9, welcome_msg_len
+  mov byte [line_len], r9b
+  mov byte [line_buf], " "
+
+  ; Fill the line with space
+  call fill_line
+
+  ; Draw right marker
+  mov byte [buf], "|"
+  mov byte [buf_len], 1
+  call print_buf
+
   ret
 
 _start: 

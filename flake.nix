@@ -13,6 +13,8 @@
       buildInputs = [
         pkgs.nasm
         pkgs.gdb
+        pkgs.man-pages
+        pkgs.man-pages-posix
       ];
 
       shellHook = ''
